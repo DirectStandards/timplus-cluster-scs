@@ -1,8 +1,11 @@
 package org.directtruststandards.timplus.cluster.routing;
 
+import java.io.StringReader;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import org.dom4j.Element;
+import org.dom4j.io.XMPPPacketReader;
 import org.jivesoftware.openfire.PacketRouteStatus;
 import org.jivesoftware.openfire.RemotePacketRouter;
 import org.jivesoftware.openfire.XMPPServer;
@@ -11,8 +14,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
+import org.xmlpull.mxp1.MXParser;
+import org.xmlpull.v1.XmlPullParserFactory;
+import org.xmpp.packet.IQ;
 import org.xmpp.packet.JID;
 import org.xmpp.packet.Packet;
+import org.xmpp.packet.Presence;
 
 import reactor.core.publisher.EmitterProcessor;
 import reactor.core.publisher.Flux;
@@ -35,7 +42,7 @@ public class SCSClusteredPacketRouter implements RemotePacketRouter
 	{
 		final ClusteredPacket clustPacket = new ClusteredPacket();
 		clustPacket.setDestNode(nodeID);
-		clustPacket.setPacket(packet);
+		clustPacket.setPacket(packet.toXML());
 		clustPacket.setReceipient(receipient);
 		
 		
@@ -79,10 +86,50 @@ public class SCSClusteredPacketRouter implements RemotePacketRouter
 			
 			if (destNode == null || XMPPServer.getInstance().getNodeID().equals(destNode))
 			{
+				Packet thePacket = null;
+				
 				final ClusteredPacket packet = msg.getPayload();
 				
-				XMPPServer.getInstance().getRoutingTable().routePacket(packet.getReceipient(), packet.getPacket(), false);
-	
+				try
+				{
+					XmlPullParserFactory factory = XmlPullParserFactory.newInstance(MXParser.class.getName(), null);
+		            factory.setNamespaceAware(true);
+	                final XMPPPacketReader parser = new XMPPPacketReader();
+	                parser.setXPPFactory( factory );
+	                
+	                
+					
+					Element doc = parser.read(new StringReader(packet.getPacket())).getRootElement();
+					
+					String tag = doc.getName();
+					
+					switch(tag)
+					{
+						case "messge":
+						{
+							thePacket = new org.xmpp.packet.Message(doc, true);
+							break;
+						}
+						case "presense":
+						{
+							
+							thePacket = new Presence(doc, true);
+							break;	
+						}
+						case "iq":
+						{
+							thePacket = new IQ(doc, true);
+							break;	
+						}
+							
+					}
+					
+					XMPPServer.getInstance().getRoutingTable().routePacket(packet.getReceipient(), thePacket, false);
+				}
+				catch (Exception e)
+				{
+					e.printStackTrace();
+				}
 			}
 		};
 	}
