@@ -6,6 +6,7 @@ import java.util.function.Supplier;
 import org.jivesoftware.openfire.PacketRouteStatus;
 import org.jivesoftware.openfire.RemotePacketRouter;
 import org.jivesoftware.openfire.XMPPServer;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
@@ -22,6 +23,7 @@ import reactor.core.publisher.Flux;
  * programming paradigm.
  */
 @Component("SCSClusteredPacketRouter")
+@ConditionalOnProperty(value="timplus.server.enableClustering", havingValue = "true", matchIfMissing=false)
 public class SCSClusteredPacketRouter implements RemotePacketRouter
 {
 	protected static final String CLUSTER_NODE_HEADER = "clusterNode";
