@@ -77,18 +77,16 @@ public class SCSClusteredPacketRouter implements RemotePacketRouter
 	 * and hands off the message to the internal routing table.
 	 */
 	@Bean 
-	public Consumer<Message<ClusteredPacket>> remotePacketConsumer() 
+	public Consumer<ClusteredPacket> remotePacketConsumer() 
 	{
-		return msg ->
+		return packet ->
 		{
 			// make sure this message is destined to us
-			final byte[] destNode = msg.getHeaders().get(CLUSTER_NODE_HEADER, byte[].class);
+			final byte[] destNode = packet.getDestNode();
 			
 			if (destNode == null || XMPPServer.getInstance().getNodeID().equals(destNode))
 			{
 				Packet thePacket = null;
-				
-				final ClusteredPacket packet = msg.getPayload();
 				
 				try
 				{
