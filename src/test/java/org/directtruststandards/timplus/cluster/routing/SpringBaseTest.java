@@ -22,12 +22,17 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.xmpp.packet.JID;
 import org.xmpp.packet.Packet;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 @ExtendWith(SpringExtension.class)
 @SpringBootTest(classes = TestApplication.class, webEnvironment = WebEnvironment.DEFINED_PORT)
 public abstract class SpringBaseTest 
 {
 	@Autowired
 	protected ApplicationContext context;
+	
+	@Autowired
+	protected ObjectMapper mapper;
 	
 	protected RemotePacketRouter router;
 	

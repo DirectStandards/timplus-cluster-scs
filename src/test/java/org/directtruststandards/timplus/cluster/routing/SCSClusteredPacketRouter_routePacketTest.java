@@ -1,7 +1,9 @@
 package org.directtruststandards.timplus.cluster.routing;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+import org.jivesoftware.openfire.cluster.NodeID;
 import org.junit.jupiter.api.Test;
 import org.springframework.cloud.stream.binder.test.OutputDestination;
 import org.springframework.messaging.Message;
@@ -30,5 +32,12 @@ public class SCSClusteredPacketRouter_routePacketTest extends SpringBaseTest
 		
 		assertNotNull(outputMessage);
 		
+		final ClusteredPacket packet = new ClusteredPacketMessageConverter(mapper).fromStreamMessage(outputMessage);
+		
+		assertEquals(msg.toXML(), packet.getPacket());
+		assertEquals(NodeID.getInstance(new byte[] {0,0,0,0}), NodeID.getInstance(packet.getDestNode()));
+		assertEquals(recipJid.getNode(), packet.getRecipLocal());
+		assertEquals(recipJid.getDomain(), packet.getRecipDomain());
+		assertEquals(recipJid.getResource(), packet.getRecipResource());
 	}
 }

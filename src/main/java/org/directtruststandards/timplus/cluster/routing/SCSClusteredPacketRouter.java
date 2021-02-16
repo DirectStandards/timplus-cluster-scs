@@ -9,10 +9,10 @@ import org.dom4j.io.XMPPPacketReader;
 import org.jivesoftware.openfire.PacketRouteStatus;
 import org.jivesoftware.openfire.RemotePacketRouter;
 import org.jivesoftware.openfire.XMPPServer;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.messaging.Message;
-import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.stereotype.Component;
 import org.xmlpull.mxp1.MXParser;
 import org.xmlpull.v1.XmlPullParserFactory;
@@ -20,6 +20,8 @@ import org.xmpp.packet.IQ;
 import org.xmpp.packet.JID;
 import org.xmpp.packet.Packet;
 import org.xmpp.packet.Presence;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import reactor.core.publisher.EmitterProcessor;
 import reactor.core.publisher.Flux;
@@ -32,23 +34,28 @@ import reactor.core.publisher.Flux;
 @Component("SCSClusteredPacketRouter")
 @ConditionalOnProperty(value="timplus.server.enableClustering", havingValue = "true", matchIfMissing=false)
 public class SCSClusteredPacketRouter implements RemotePacketRouter
-{
-	protected static final String CLUSTER_NODE_HEADER = "clusterNode";
-	
-	protected final EmitterProcessor<Message<ClusteredPacket>> processor = EmitterProcessor.create();
+{	
+	protected final EmitterProcessor<Message<?>> processor = EmitterProcessor.create();
 
+	@Autowired
+	protected ObjectMapper mapper;
+	
 	@Override
-	public PacketRouteStatus routePacket(byte[] nodeID, JID receipient, Packet packet) 
+	public PacketRouteStatus routePacket(byte[] nodeID, JID recipient, Packet packet) 
 	{
 		final ClusteredPacket clustPacket = new ClusteredPacket();
 		clustPacket.setDestNode(nodeID);
 		clustPacket.setPacket(packet.toXML());
-		clustPacket.setReceipient(receipient);
+		
+		if (recipient != null)
+		{
+			clustPacket.setRecipLocal(recipient.getNode());
+			clustPacket.setRecipDomain(recipient.getDomain());
+			clustPacket.setRecipResource(recipient.getResource());
+		}
 		
 		
-        final Message<ClusteredPacket> msg = MessageBuilder.withPayload(clustPacket)
-                .setHeader(CLUSTER_NODE_HEADER, nodeID)
-                .build();
+        final Message<?> msg = new ClusteredPacketMessageConverter(mapper).toStreamMessage(clustPacket);
         
         processor.onNext(msg);
         
@@ -66,7 +73,7 @@ public class SCSClusteredPacketRouter implements RemotePacketRouter
 	 * @return A Flux of Clustered packet objects that will be delivered to all servers in the "cluster"
 	 */
 	@Bean 
-    public Supplier<Flux<Message<ClusteredPacket>>> remotePacketSupplier() 
+    public Supplier<Flux<Message<?>>> remotePacketSupplier() 
 	{
 		return () -> this.processor;
     }
@@ -77,12 +84,14 @@ public class SCSClusteredPacketRouter implements RemotePacketRouter
 	 * and hands off the message to the internal routing table.
 	 */
 	@Bean 
-	public Consumer<ClusteredPacket> remotePacketConsumer() 
+	public Consumer<Message<?>> remotePacketConsumer() 
 	{
-		return packet ->
+		return msg ->
 		{
+			final ClusteredPacket clusteredPacket = new ClusteredPacketMessageConverter(mapper).fromStreamMessage(msg);
+			
 			// make sure this message is destined to us
-			final byte[] destNode = packet.getDestNode();
+			final byte[] destNode = clusteredPacket.getDestNode();
 			
 			if (destNode == null || XMPPServer.getInstance().getNodeID().equals(destNode))
 			{
@@ -97,7 +106,7 @@ public class SCSClusteredPacketRouter implements RemotePacketRouter
 	                
 	                
 					
-					Element doc = parser.read(new StringReader(packet.getPacket())).getRootElement();
+					Element doc = parser.read(new StringReader(clusteredPacket.getPacket())).getRootElement();
 					
 					String tag = doc.getName();
 					
@@ -122,7 +131,9 @@ public class SCSClusteredPacketRouter implements RemotePacketRouter
 							
 					}
 					
-					XMPPServer.getInstance().getRoutingTable().routePacket(packet.getReceipient(), thePacket, false);
+					final JID recipJid = new JID(clusteredPacket.getRecipLocal(), clusteredPacket.getRecipDomain(), clusteredPacket.getRecipResource());
+					
+					XMPPServer.getInstance().getRoutingTable().routePacket(recipJid, thePacket, false);
 				}
 				catch (Exception e)
 				{
