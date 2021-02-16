@@ -9,12 +9,13 @@ import org.dom4j.io.XMPPPacketReader;
 import org.jivesoftware.openfire.PacketRouteStatus;
 import org.jivesoftware.openfire.RemotePacketRouter;
 import org.jivesoftware.openfire.XMPPServer;
+import org.jivesoftware.openfire.net.MXParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.messaging.Message;
+import org.springframework.messaging.MessagingException;
 import org.springframework.stereotype.Component;
-import org.xmlpull.mxp1.MXParser;
 import org.xmlpull.v1.XmlPullParserFactory;
 import org.xmpp.packet.IQ;
 import org.xmpp.packet.JID;
@@ -93,53 +94,68 @@ public class SCSClusteredPacketRouter implements RemotePacketRouter
 			// make sure this message is destined to us
 			final byte[] destNode = clusteredPacket.getDestNode();
 			
-			if (destNode == null || XMPPServer.getInstance().getNodeID().equals(destNode))
+			if (destNode == null || (XMPPServer.getInstance() != null && XMPPServer.getInstance().getNodeID().equals(destNode)))
 			{
-				Packet thePacket = null;
+				Packet thePacket = xmlToXMPPPacket(clusteredPacket.getPacket());
 				
 				try
 				{
-					XmlPullParserFactory factory = XmlPullParserFactory.newInstance(MXParser.class.getName(), null);
-		            factory.setNamespaceAware(true);
-	                final XMPPPacketReader parser = new XMPPPacketReader();
-	                parser.setXPPFactory( factory );
-	                
-	                
-					
-					Element doc = parser.read(new StringReader(clusteredPacket.getPacket())).getRootElement();
-					
-					String tag = doc.getName();
-					
-					switch(tag)
-					{
-						case "messge":
-						{
-							thePacket = new org.xmpp.packet.Message(doc, true);
-							break;
-						}
-						case "presense":
-						{
-							
-							thePacket = new Presence(doc, true);
-							break;	
-						}
-						case "iq":
-						{
-							thePacket = new IQ(doc, true);
-							break;	
-						}
-							
-					}
-					
+
 					final JID recipJid = new JID(clusteredPacket.getRecipLocal(), clusteredPacket.getRecipDomain(), clusteredPacket.getRecipResource());
 					
 					XMPPServer.getInstance().getRoutingTable().routePacket(recipJid, thePacket, false);
 				}
 				catch (Exception e)
 				{
-					e.printStackTrace();
+					throw new MessagingException("Failed to process remote packet.", e);
 				}
 			}
 		};
+	}
+	
+	protected static Packet xmlToXMPPPacket(String XML)
+	{
+		try
+		{
+			Packet retVal = null;
+			
+			XmlPullParserFactory factory = XmlPullParserFactory.newInstance(MXParser.class.getName(), null);
+	        factory.setNamespaceAware(true);
+	        final XMPPPacketReader parser = new XMPPPacketReader();
+	        parser.setXPPFactory( factory );
+	        
+	        
+			
+			Element doc = parser.read(new StringReader(XML)).getRootElement();
+			
+			String tag = doc.getName();
+			
+			switch(tag)
+			{
+				case "message":
+				{
+					retVal = new org.xmpp.packet.Message(doc, true);
+					break;
+				}
+				case "presence":
+				{
+					
+					retVal = new Presence(doc, true);
+					break;	
+				}
+				case "iq":
+				{
+					retVal = new IQ(doc, true);
+					break;	
+				}
+					
+			}
+			
+			return retVal;
+		}
+		catch (Exception e)
+		{
+			throw new MessagingException("Failed to convert cluster packet from internal structure");
+		}
 	}
 }
