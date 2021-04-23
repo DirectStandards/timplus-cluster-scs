@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.directtruststandards</groupId>
 	<artifactId>timplus-cluster-scs</artifactId>
-	<version>1.0.0-SNAPSHOT</version>
+	<version>1.0.0</version>
 	<name>TIM+ Cluster Spring Cloud Sreams Remote Package Routing</name>
 	<description>TIM+ cluster RemotePacketRouter backed by SpringCloud Streams (SCS).</description>
     <parent>
@@ -50,12 +50,12 @@
 		<dependency>
 			<groupId>org.directtruststandards</groupId>
 			<artifactId>timplus-server-core</artifactId>
-			<version>1.0.0-SNAPSHOT</version>			
+			<version>1.0.0</version>			
 		</dependency>		
 		<dependency>
 			<groupId>org.directtruststandards</groupId>
 			<artifactId>timplus-cluster</artifactId>
-			<version>1.0.0-SNAPSHOT</version>			
+			<version>1.0.0</version>			
 		</dependency>	
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
@@ -112,7 +112,48 @@
 						</goals>
 					</execution>
 				</executions>
-			</plugin>									
+			</plugin>	
+		    <plugin>
+		      	<groupId>org.apache.maven.plugins</groupId> 
+		        <artifactId>maven-javadoc-plugin</artifactId>
+		        <version>2.9.1</version>
+		        <configuration>
+				    <additionalparam>-Xdoclint:none</additionalparam>
+					<charset>UTF-8</charset>
+					<docencoding>UTF-8</docencoding>
+					<docfilessubdirs>true</docfilessubdirs>
+					<detectJavaApiLink>true</detectJavaApiLink>
+					<detectLinks>true</detectLinks>
+					<source>1.8</source>
+					<show>public</show> 
+		            <excludePackageNames>
+		            </excludePackageNames>   	                      	          
+		        </configuration>
+		        <executions>
+		            <execution>
+		                <phase>package</phase>
+		                <id>attach-javadocs</id>
+		                <goals>
+		                  <goal>jar</goal>
+		                </goals>
+		            </execution>
+		        </executions>		        
+		    </plugin>  	
+		    <!--  for releases only	 	
+		    <plugin>
+	             <groupId>org.apache.maven.plugins</groupId>
+	             <artifactId>maven-gpg-plugin</artifactId>
+	            <executions>
+	               <execution>
+	                  <id>sign-artifacts</id>
+	                     <phase>package</phase>
+	                     <goals>
+	                        <goal>sign</goal>
+	                     </goals>
+	              </execution>
+	            </executions>
+	        </plugin>	
+	        -->											
 		</plugins>
 	</build>
   <distributionManagement>
